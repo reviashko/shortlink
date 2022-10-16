@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Short link manager</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://getbootstrap.com/docs/4.0/dist/css/bootstrap.min.css">
+  </head>
+  <body>
+
+  <section class="section">
+    <div class="container">
+      <div class="form-group">
+        <label for="exampleInputEmail1">URL:</label>
+        <input id="url" class="form-control" type="text" placeholder="https://an-domen.com/sub/params">
+      </div>
+      <button id="saveBtn" type="button" class="btn btn-primary">save</button>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <table class="table is-striped is-fullwidth">
+        <thead>
+          <tr>
+            <th>KEY</th>
+            <th>URL</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{%content%}}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </body>
+  <script>
+
+    var saveBtn = document.getElementById("saveBtn");
+    saveBtn.addEventListener('click', function() {
+
+      var url = document.getElementById("url").value;
+      if (url == '') {
+        alert('too short url');
+        return;
+      }
+
+      var newXHR = new XMLHttpRequest();
+      newXHR.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        window.location.reload();
+       }
+      };
+      newXHR.open('POST', '/api');
+      newXHR.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      var formData = 'url='+url;
+      newXHR.send(formData);
+    });
+
+    var rmBtns = document.getElementsByClassName("rmBtn");
+    for (i = 0; i < rmBtns.length; i++) {
+      rmBtns[i].addEventListener('click', function() {
+          
+        var key = this.getAttribute('ref')
+        var warningText = "Remove "+key+"?"
+        if (window.confirm(warningText)) {
+
+          var newXHR = new XMLHttpRequest();
+          newXHR.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            window.location.reload();
+          }};
+          newXHR.open('DELETE', '/api/'+key);
+          newXHR.send(); 
+        }
+
+      });
+    }
+
+  </script>
+</html>
