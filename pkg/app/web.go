@@ -15,6 +15,7 @@ type WebServerInterface interface {
 	AddUGetHandler(route string, nextFn func(string, string) (int, string, string))
 	AddPostHandler(route string, nextFn func(string, string) (int, string, string))
 	AddDeleteHandler(route string, nextFn func(string, string) (int, string, string))
+	BaseHandler(c echo.Context, nextFn func(string, string) (int, string, string)) error
 }
 
 // WebServer struct
@@ -54,7 +55,8 @@ func (w *WebServer) initAuth(auth []model.AuthItem) {
 	}))
 }
 
-func (w *WebServer) httpHandler(c echo.Context, route string, nextFn func(string, string) (int, string, string)) error {
+// BaseHandler func
+func (w *WebServer) BaseHandler(c echo.Context, nextFn func(string, string) (int, string, string)) error {
 
 	url := c.FormValue("url")
 	key := c.FormValue("key")
@@ -83,27 +85,27 @@ func (w *WebServer) httpHandler(c echo.Context, route string, nextFn func(string
 // AddGetHandler func
 func (w *WebServer) AddGetHandler(route string, nextFn func(string, string) (int, string, string)) {
 	w.Echo.GET(route, func(c echo.Context) error {
-		return w.httpHandler(c, route, nextFn)
+		return w.BaseHandler(c, nextFn)
 	})
 }
 
 // AddUGetHandler func
 func (w *WebServer) AddUGetHandler(route string, nextFn func(string, string) (int, string, string)) {
 	w.UnSafe.GET(route, func(c echo.Context) error {
-		return w.httpHandler(c, route, nextFn)
+		return w.BaseHandler(c, nextFn)
 	})
 }
 
 // AddPostHandler func
 func (w *WebServer) AddPostHandler(route string, nextFn func(string, string) (int, string, string)) {
 	w.Echo.POST(route, func(c echo.Context) error {
-		return w.httpHandler(c, route, nextFn)
+		return w.BaseHandler(c, nextFn)
 	})
 }
 
 // AddDeleteHandler func
 func (w *WebServer) AddDeleteHandler(route string, nextFn func(string, string) (int, string, string)) {
 	w.Echo.DELETE(route, func(c echo.Context) error {
-		return w.httpHandler(c, route, nextFn)
+		return w.BaseHandler(c, nextFn)
 	})
 }

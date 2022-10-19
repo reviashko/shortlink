@@ -11,7 +11,8 @@ import (
 // StorageInterface interface
 type StorageInterface interface {
 	Get() ([]model.URLItem, error)
-	Delete(key string) error
+	GetSyncData(id int64) ([]model.URLItem, error)
+	Delete(id int64) error
 	Save(model.URLItem) error
 	Init() error
 }
@@ -45,7 +46,7 @@ func NewPostgreStorage(dbURL string) PostgreStorage {
 // Init func
 func (p *PostgreStorage) Init() error {
 
-	_, err := p.DB.Exec("create table if not exists data(key varchar, url varchar, constraint pk_data primary key(key))")
+	_, err := p.DB.Exec("create table if not exists data(id bigint, key varchar, url varchar, constraint pk_data primary key(id))")
 	if err != nil {
 		return err
 	}
@@ -58,7 +59,7 @@ func (p *PostgreStorage) Get() ([]model.URLItem, error) {
 
 	result := make([]model.URLItem, 0, 50)
 
-	rows, err := p.DB.Query("select key, url from data")
+	rows, err := p.DB.Query("select id, key, url from data")
 	if err != nil {
 		return result, err
 	}
@@ -66,7 +67,28 @@ func (p *PostgreStorage) Get() ([]model.URLItem, error) {
 
 	for rows.Next() {
 		item := model.URLItem{}
-		rows.Scan(&item.Key, &item.URL)
+		rows.Scan(&item.ID, &item.Key, &item.URL)
+
+		result = append(result, item)
+	}
+
+	return result, nil
+}
+
+// GetSyncData func
+func (p *PostgreStorage) GetSyncData(id int64) ([]model.URLItem, error) {
+
+	result := make([]model.URLItem, 0, 50)
+
+	rows, err := p.DB.Query("select id, key, url from data where id > $1", id)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		item := model.URLItem{}
+		rows.Scan(&item.ID, &item.Key, &item.URL)
 
 		result = append(result, item)
 	}
@@ -77,7 +99,7 @@ func (p *PostgreStorage) Get() ([]model.URLItem, error) {
 // Save func
 func (p *PostgreStorage) Save(item model.URLItem) error {
 
-	_, err := p.DB.Exec("insert into data (key, url) values($1, $2)on conflict on constraint pk_data do update set url=$2", item.Key, item.URL)
+	_, err := p.DB.Exec("insert into data (id, key, url) values($1, $2, $3)on conflict on constraint pk_data do update set url=$3", item.ID, item.Key, item.URL)
 	if err != nil {
 		return err
 	}
@@ -86,9 +108,9 @@ func (p *PostgreStorage) Save(item model.URLItem) error {
 }
 
 // Delete func
-func (p *PostgreStorage) Delete(key string) error {
+func (p *PostgreStorage) Delete(id int64) error {
 
-	_, err := p.DB.Exec("delete from data WHERE key = $1", key)
+	_, err := p.DB.Exec("delete from data WHERE id = $1", id)
 	if err != nil {
 		return err
 	}

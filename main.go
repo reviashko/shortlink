@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/reviashko/shortlink/pkg/app"
@@ -10,7 +11,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-var acceptMutex sync.RWMutex
+var (
+	acceptMutex = sync.Mutex{}
+)
 
 func main() {
 	// Init echo server
@@ -19,13 +22,23 @@ func main() {
 	DBURL := os.Getenv("DB_URL")
 	db := repository.NewPostgreStorage(DBURL)
 
-	AuthData := os.Getenv("AUTH_DATA")
-	if AuthData == "" {
-		AuthData = `[{"Login":"joe", "Password": "secret"}]`
+	AUTHDATA := os.Getenv("AUTH_DATA")
+	if AUTHDATA == "" {
+		AUTHDATA = `[{"Login":"joe", "Password": "secret"}]`
 	}
 
-	web := app.NewWebServer(e, []byte(AuthData))
-	app.NewController(&db, &web, &acceptMutex)
+	REFRESHTIME := os.Getenv("REFRESH_TIME")
+	if REFRESHTIME == "" {
+		REFRESHTIME = `10`
+	}
+
+	refreshTIME, err := strconv.Atoi(REFRESHTIME)
+	if err != nil {
+		panic(err)
+	}
+
+	web := app.NewWebServer(e, []byte(AUTHDATA))
+	app.NewController(&db, &web, &acceptMutex, refreshTIME)
 
 	// Start echo server
 	PORT := os.Getenv("PORT")
