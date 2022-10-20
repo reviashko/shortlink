@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,15 +17,14 @@ import (
 type Controller struct {
 	Storage    repository.StorageInterface
 	Web        WebServerInterface
-	Data       map[string]model.ShortURLItem
-	Mutex      *sync.Mutex
-	SortedKeys []string
+	Data       model.SafeMap
+	SortedKeys model.SafeStringArray
 	MaxID      int64
 }
 
 // NewController func
 func NewController(storage repository.StorageInterface, web WebServerInterface, mutex *sync.Mutex, refreshTimeSec int) Controller {
-	instance := Controller{Mutex: mutex, Storage: storage, Web: web, Data: map[string]model.ShortURLItem{}, SortedKeys: []string{}, MaxID: 0}
+	instance := Controller{Storage: storage, Web: web, Data: model.SafeMap{Mx: mutex}, SortedKeys: model.SafeStringArray{Mx: mutex}, MaxID: 0}
 	instance.init(refreshTimeSec)
 	return instance
 }
@@ -43,13 +41,11 @@ func (c *Controller) SyncData(refreshTimeSec int) {
 		}
 
 		// TODO: embrace deleted items
-		c.Mutex.Lock()
 		for _, item := range data {
-			c.Data[item.Key] = model.ShortURLItem{ID: item.ID, URL: item.URL}
-			c.SortedKeys = append(c.SortedKeys, item.Key)
+			c.Data.Add(item.Key, model.ShortURLItem{ID: item.ID, URL: item.URL})
+			c.SortedKeys.Append(item.Key, false)
 		}
-		sort.Strings(c.SortedKeys)
-		c.Mutex.Unlock()
+		c.SortedKeys.Sort()
 	}
 }
 
@@ -68,20 +64,9 @@ func (c *Controller) NewID() string {
 	return sb.String()
 }
 
-// IsURLExist func
-func (c *Controller) IsURLExist(url string) bool {
-
-	for _, item := range c.Data {
-		if url == item.URL {
-			return true
-		}
-	}
-
-	return false
-}
-
 // init func
 func (c *Controller) init(refreshTimeSec int) {
+
 	err := c.initStorage()
 	if err != nil {
 		panic(err.Error())
@@ -103,16 +88,18 @@ func (c *Controller) initStorage() error {
 		return err
 	}
 
-	c.SortedKeys = make([]string, 0, len(data))
+	c.Data.Init()
+	c.SortedKeys.Init(len(data))
+
 	for _, item := range data {
-		c.Data[item.Key] = model.ShortURLItem{ID: item.ID, URL: item.URL}
-		c.SortedKeys = append(c.SortedKeys, item.Key)
+		c.Data.Add(item.Key, model.ShortURLItem{ID: item.ID, URL: item.URL})
+		c.SortedKeys.Append(item.Key, false)
 		if item.ID > c.MaxID {
 			c.MaxID = item.ID
 		}
 	}
 
-	sort.Strings(c.SortedKeys)
+	c.SortedKeys.Sort()
 
 	return nil
 }
@@ -120,10 +107,7 @@ func (c *Controller) initStorage() error {
 // ShortURLHandler func
 func (c *Controller) ShortURLHandler(key string, url string) (int, string, string) {
 
-	c.Mutex.Lock()
-	item, exists := c.Data[key]
-	c.Mutex.Unlock()
-
+	item, exists := c.Data.Get(key)
 	if !exists {
 		return http.StatusNotFound, "Not found", model.StringResp
 	}
@@ -138,12 +122,10 @@ func (c *Controller) ListURLsHandler(key string, url string) (int, string, strin
 	rowTemplate, _ := os.ReadFile("templates/row.html")
 	row := string(rowTemplate)
 
-	c.Mutex.Lock()
-	for _, key := range c.SortedKeys {
-		item := c.Data[key]
+	for _, key := range c.SortedKeys.Get() {
+		item, _ := c.Data.Get(key)
 		sb.WriteString(fmt.Sprintf(row, key, key, item.URL, key))
 	}
-	c.Mutex.Unlock()
 
 	file, _ := os.ReadFile("templates/index.html")
 	content := string(file)
@@ -161,10 +143,7 @@ func (c *Controller) AddURLsHandler(key string, url string) (int, string, string
 		loops := 0
 		for keyIsExists {
 
-			c.Mutex.Lock()
-			_, keyIsExists = c.Data[key]
-			c.Mutex.Unlock()
-
+			_, keyIsExists = c.Data.Get(key)
 			if keyIsExists {
 				key = c.NewID()
 			}
@@ -172,7 +151,6 @@ func (c *Controller) AddURLsHandler(key string, url string) (int, string, string
 			if loops > 50 {
 				return http.StatusInternalServerError, "no free keys", model.JSONResp
 			}
-
 			loops++
 		}
 	}
@@ -181,11 +159,7 @@ func (c *Controller) AddURLsHandler(key string, url string) (int, string, string
 		return http.StatusInternalServerError, "error", model.JSONResp
 	}
 
-	c.Mutex.Lock()
-	isExists := c.IsURLExist(url)
-	c.Mutex.Unlock()
-
-	if isExists {
+	if c.Data.IsExists(url) {
 		return http.StatusOK, "ok", model.JSONResp
 	}
 
@@ -195,11 +169,8 @@ func (c *Controller) AddURLsHandler(key string, url string) (int, string, string
 		return http.StatusInternalServerError, "error", model.JSONResp
 	}
 
-	c.Mutex.Lock()
-	c.Data[key] = model.ShortURLItem{ID: newID, URL: url}
-	c.SortedKeys = append(c.SortedKeys, key)
-	sort.Strings(c.SortedKeys)
-	c.Mutex.Unlock()
+	c.Data.Add(key, model.ShortURLItem{ID: newID, URL: url})
+	c.SortedKeys.Append(key, true)
 
 	return http.StatusOK, "ok", model.JSONResp
 }
@@ -217,9 +188,7 @@ func (c *Controller) DeleteURLHandler(key string, url string) (int, string, stri
 		return http.StatusInternalServerError, "error", model.JSONResp
 	}
 
-	c.Mutex.Lock()
-	item, isExists := c.Data[key]
-	c.Mutex.Unlock()
+	item, isExists := c.Data.Get(key)
 	if !isExists {
 		return http.StatusOK, "ok", model.JSONResp
 	}
@@ -229,17 +198,8 @@ func (c *Controller) DeleteURLHandler(key string, url string) (int, string, stri
 		return http.StatusInternalServerError, "error", model.JSONResp
 	}
 
-	c.Mutex.Lock()
-	delete(c.Data, key)
-
-	tmp := make([]string, 0, len(c.SortedKeys))
-	for _, itemKey := range c.SortedKeys {
-		if itemKey != key {
-			tmp = append(tmp, itemKey)
-		}
-	}
-	c.SortedKeys = tmp
-	c.Mutex.Unlock()
+	c.Data.Delete(key)
+	c.SortedKeys.Delete(key)
 
 	return http.StatusOK, "ok", model.JSONResp
 }

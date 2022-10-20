@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -46,15 +45,13 @@ func (s *mockStorage) Init() error {
 	return nil
 }
 
-var testMutex sync.Mutex
-
 func TestGetRedirectURL(t *testing.T) {
 
 	e := echo.New()
 
 	storage := mockStorage{}
 	web := app.NewWebServer(e, []byte(`[{"Login":"joe", "Password": "secret"}]`))
-	cntrl := app.NewController(&storage, &web, &testMutex, 5)
+	cntrl := app.NewController(&storage, &web, &acceptMutex, 5)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -74,7 +71,7 @@ func TestGetURLList(t *testing.T) {
 
 	storage := mockStorage{}
 	web := app.NewWebServer(e, []byte(`[{"Login":"joe", "Password": "secret"}]`))
-	cntrl := app.NewController(&storage, &web, &testMutex, 5)
+	cntrl := app.NewController(&storage, &web, &acceptMutex, 5)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
@@ -92,20 +89,15 @@ func TestSyncData(t *testing.T) {
 
 	storage := mockStorage{}
 	web := app.NewWebServer(e, []byte(`[{"Login":"joe", "Password": "secret"}]`))
-	cntrl := app.NewController(&storage, &web, &testMutex, 5)
+	cntrl := app.NewController(&storage, &web, &acceptMutex, 5)
 
-	testMutex.Lock()
-	dataInit := len(cntrl.Data)
-	testMutex.Unlock()
+	dataInit := cntrl.Data.Size()
 	time.Sleep(time.Duration(6) * time.Second)
-	testMutex.Lock()
-	dataFinish := len(cntrl.Data)
-	testMutex.Unlock()
+	dataFinish := cntrl.Data.Size()
 
 	if dataFinish == dataInit {
 		t.Errorf("Wrong sync data. Waiting 1 item diff. Current: %d\n", dataFinish)
 	}
-
 }
 
 func TestAddNewURL(t *testing.T) {
@@ -114,7 +106,7 @@ func TestAddNewURL(t *testing.T) {
 
 	storage := mockStorage{}
 	web := app.NewWebServer(e, []byte(`[{"Login":"joe", "Password": "secret"}]`))
-	cntrl := app.NewController(&storage, &web, &testMutex, 5)
+	cntrl := app.NewController(&storage, &web, &acceptMutex, 5)
 
 	f := make(url.Values)
 	f.Set("url", "/superurl/test")
@@ -135,7 +127,7 @@ func TestDeleteURL(t *testing.T) {
 
 	storage := mockStorage{}
 	web := app.NewWebServer(e, []byte(`[{"Login":"joe", "Password": "secret"}]`))
-	cntrl := app.NewController(&storage, &web, &testMutex, 5)
+	cntrl := app.NewController(&storage, &web, &acceptMutex, 5)
 
 	req := httptest.NewRequest(http.MethodDelete, "/", nil)
 	rec := httptest.NewRecorder()
@@ -145,13 +137,13 @@ func TestDeleteURL(t *testing.T) {
 	c.SetParamNames("key")
 	c.SetParamValues("key1")
 
-	lenBefore := len(cntrl.Data)
+	lenBefore := cntrl.Data.Size()
 
 	if assert.NoError(t, web.BaseHandler(c, cntrl.DeleteURLHandler)) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 	}
 
-	lenAfter := len(cntrl.Data)
+	lenAfter := cntrl.Data.Size()
 
 	if !((lenBefore - lenAfter) == 1) {
 		t.Errorf("Wrong deleted items count\n")
