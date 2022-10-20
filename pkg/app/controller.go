@@ -181,6 +181,11 @@ func (c *Controller) LoginHandler(key string, url string) (int, string, string) 
 	return http.StatusOK, string(file), model.HTMLResp
 }
 
+// HeartBeat func
+func (c *Controller) HeartBeat(key string, url string) (int, string, string) {
+	return http.StatusOK, "ok", model.JSONResp
+}
+
 // DeleteURLHandler func
 func (c *Controller) DeleteURLHandler(key string, url string) (int, string, string) {
 
@@ -209,6 +214,7 @@ func (c *Controller) initHandlers() {
 
 	c.Web.AddGetHandler("/", c.ListURLsHandler)
 	c.Web.AddUGetHandler("/:key", c.ShortURLHandler)
+	c.Web.AddUGetHandler("/heartbeat", c.HeartBeat)
 	c.Web.AddGetHandler("/login", c.LoginHandler)
 	c.Web.AddPostHandler("/api", c.AddURLsHandler)
 	c.Web.AddDeleteHandler("/api/:key", c.DeleteURLHandler)
