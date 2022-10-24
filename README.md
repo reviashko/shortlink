@@ -26,15 +26,6 @@ docker build --tag shortlink -t shortlink:multistage .
 
 docker run --env-file .env_test -p 8080:8080 shortlink:multistage
 
-// Запуск сервиса в контейнере для prod
-docker run --rm -d --name passport-verifier \
--e APP_DB_DRIVER=pgx \
--e APP_DB_DSN=postgres://username:password@127.0.0.1:5432/dbname?sslmode=disable \
--e APP_LOG_LEVEL=2 \
--e APP_PORT=8444 \
--e APP_PASSPORTS_URL="https://проверки.гувм.мвд.рф/upload/expired-passports/list_of_expired_passports.csv.bz2" \
--p 8444:8444 passport-verifier:1.0
-
 
 ## License
 
