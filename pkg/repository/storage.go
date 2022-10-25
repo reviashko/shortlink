@@ -67,7 +67,10 @@ func (p *PostgreStorage) Get() ([]model.URLItem, error) {
 
 	for rows.Next() {
 		item := model.URLItem{}
-		rows.Scan(&item.ID, &item.Key, &item.URL)
+		err = rows.Scan(&item.ID, &item.Key, &item.URL)
+		if err != nil {
+			return result, err
+		}
 
 		result = append(result, item)
 	}
@@ -88,7 +91,10 @@ func (p *PostgreStorage) GetSyncData(id int64) ([]model.URLItem, error) {
 
 	for rows.Next() {
 		item := model.URLItem{}
-		rows.Scan(&item.ID, &item.Key, &item.URL)
+		err = rows.Scan(&item.ID, &item.Key, &item.URL)
+		if err != nil {
+			return result, err
+		}
 
 		result = append(result, item)
 	}
