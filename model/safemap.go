@@ -6,13 +6,23 @@ import (
 
 // SafeMap struct
 type SafeMap struct {
-	data map[string]ShortURLItem
-	Mx   *sync.Mutex
+	data  map[string]ShortURLItem
+	maxID int64
+	Mx    *sync.Mutex
 }
 
 // Init func
 func (s *SafeMap) Init() {
 	s.data = map[string]ShortURLItem{}
+	s.maxID = 0
+}
+
+// GetMaxID func
+func (s *SafeMap) GetMaxID() int64 {
+	s.Mx.Lock()
+	defer s.Mx.Unlock()
+
+	return s.maxID
 }
 
 // Add func
@@ -21,6 +31,10 @@ func (s *SafeMap) Add(key string, item ShortURLItem) {
 	defer s.Mx.Unlock()
 
 	s.data[key] = item
+
+	if item.ID > s.maxID {
+		s.maxID = item.ID
+	}
 }
 
 // Size func

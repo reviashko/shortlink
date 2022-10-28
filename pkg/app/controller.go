@@ -19,12 +19,11 @@ type Controller struct {
 	Web        WebServerInterface
 	Data       model.SafeMap
 	SortedKeys model.SafeStringArray
-	MaxID      int64
 }
 
 // NewController func
 func NewController(storage repository.StorageInterface, web WebServerInterface, mutex *sync.Mutex, refreshTimeSec int) Controller {
-	instance := Controller{Storage: storage, Web: web, Data: model.SafeMap{Mx: mutex}, SortedKeys: model.SafeStringArray{Mx: mutex}, MaxID: 0}
+	instance := Controller{Storage: storage, Web: web, Data: model.SafeMap{Mx: mutex}, SortedKeys: model.SafeStringArray{Mx: mutex}}
 	instance.init(refreshTimeSec)
 	return instance
 }
@@ -35,7 +34,7 @@ func (c *Controller) SyncData(refreshTimeSec int) {
 	for {
 		time.Sleep(time.Duration(refreshTimeSec) * time.Second)
 
-		data, err := c.Storage.GetSyncData(c.MaxID)
+		data, err := c.Storage.GetSyncData(c.Data.GetMaxID())
 		if err != nil {
 			fmt.Printf("UpdateDataDiff err: %s", err.Error())
 		}
@@ -94,9 +93,6 @@ func (c *Controller) initStorage() error {
 	for _, item := range data {
 		c.Data.Add(item.Key, model.ShortURLItem{ID: item.ID, URL: item.URL})
 		c.SortedKeys.Append(item.Key, false)
-		if item.ID > c.MaxID {
-			c.MaxID = item.ID
-		}
 	}
 
 	c.SortedKeys.Sort()

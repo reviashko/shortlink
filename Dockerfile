@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
 # ====== FINAL STAGE ====== #
 # # # # # # # # # # # # # # #
 
-FROM scratch
+FROM busybox
 WORKDIR /root/
 COPY --from=builder /go/src/templates ./templates
 COPY --from=builder /go/src/app .
